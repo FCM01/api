@@ -3,6 +3,7 @@ from cmath import pi
 from ctypes.wintypes import PINT
 from http import client
 from lib2to3.pgen2 import token
+from tokenize import group
 from urllib import request
 from flask import Flask, request, json, jsonify,render_template
 from flask_pymongo import PyMongo
@@ -10,13 +11,9 @@ from bson.objectid import ObjectId
 from bson.json_util import dumps
 from bson import json_util
 from flask_cors import CORS
-# from pymongo import MongoClient
 import json
 
-# client = MongoClient("")
 
-# db = client.get_database("hermes")
-# records  = db.hermes
 app=Flask(__name__)
 
 app.config["MONGO_URI"] = "mongodb://localhost:27017/Hermes"
@@ -62,8 +59,8 @@ def retrieve_users():
     status =200
     resp = {}
     try:
-        
         database_check  = parse_json (mongo.db.user.find())
+        print(database_check)
         array_users = []
         for database_chk in database_check:
             array_users.append(database_chk["username"])
@@ -166,12 +163,13 @@ def make_individualchat():
         user1 = data["data"]["user1"]
         user2 = data["data"]["user2"]
         room_id = data["data"]["room_id"]
-
+        
 
         if  user1!= "" and user2  != "" and room_id !="":
-            database_check  = mongo.db.chats.find({"room_id":f"{room_id}"})
+            database_check  = mongo.db.chats.find({"user1":f"{room_id}","user2": f"{user2}"})
+            database_check2  = mongo.db.chats.find({"user2":f"{room_id}","user1": f"{user2}"})
             print(parse_json(database_check))
-            if parse_json(database_check) == []:
+            if parse_json(database_check) == [] and parse_json(database_check2)== []:
                 payload ={
                     "user1":f"{user1}",
                     "user2": f"{user2}",
@@ -182,7 +180,7 @@ def make_individualchat():
                 return jsonify(resp),status
             else :
                 status =300
-                resp = {"message":"chat has been taken"}
+                resp = {"message":"chat has already been made"}
         return jsonify(resp),status
     except Exception as e :
         print("ERROR on /Make/group_chat",e)
@@ -220,6 +218,51 @@ def retrieve_chat():
         print("ERROR on /Retrive/Memberships",e)
         return jsonify(resp),status
 
+@app.route("/Delete/Chat",methods= ["POST"])
+def delete_chat():
+    status = 200
+    resp = {}
+    try:
+        data = request.get_json("data")
+        room_id=data["data"]["room_id"]
+        if room_id != "":
+            database  = mongo.db.chats.find_one({"room_id":f"{room_id}"})
+            if database != []:
+                    mongo.db.chats.delete_one({"room_id":f"{room_id}"})
+                    status =200
+                    resp = {"message":"Chat has been deleted","status":status}
+            else:
+                status =400
+                resp = {"message":"Chat not in database ","status":status}
+
+    except Exception as e :
+        status  = 400
+        resp={"message":f"{e}","status":status}  
+        print("ERORR (/Delete/Chat route)--->",e)
+    return jsonify(resp),status
+
+@app.route("/Delete/Groupchat",methods= ["POST"])
+def delete_groupchat():
+    status = 200
+    resp = {}
+    try:
+        data = request.get_json("data")
+        print(data)
+        group_name =data["data"]["group_name"]
+        if group_name  != "":
+            database  = mongo.db.group_chats.find_one({"group_name":f"{group_name}"})
+            if database != []:
+                    mongo.db.group_chats.delete_one({"group_name":f"{group_name}"})
+                    status =200
+                    resp = {"message":"Group chat has been deleted","status":status}
+            else:
+                status =400
+                resp = {"message":"Group chat not in database ","status":status}
+
+    except Exception as e :
+        status  = 400
+        resp={"message":f"{e}","status":status}  
+        print("ERORR (/Delete/Chat route)--->",e)
+    return jsonify(resp),status
 if __name__  =="__main__":
-    # app.run(debug=True)
-    app.run(host='0.0.0.0',port=5000)
+    app.run(debug=True)
